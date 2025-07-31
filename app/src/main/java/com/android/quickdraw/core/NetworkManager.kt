@@ -1,4 +1,4 @@
-package com.secure.webapp.core
+package com.android.quickdraw.core
 
 import android.content.Context
 import android.net.ConnectivityManager
