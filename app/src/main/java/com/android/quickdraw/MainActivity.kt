@@ -77,16 +77,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SMS_ROLE_REQUEST_CODE) {
-            if (!isDefaultSmsApp()) {
-                // Проверяем, был ли отказ с флагом "Больше не спрашивать"
-                if (data?.getBooleanExtra(RoleManager.EXTRA_REQUEST_ABORTED, false) == true) {
+        if (requestCode == SMS_ROLE_REQUEST_CODE && !isDefaultSmsApp()) {
+            // Для API 30+ проверяем постоянный отказ
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (data?.getBooleanExtra("android.app.extra.REQUEST_ABORTED", false) == true) {
                     userDeniedPermanently = true
                     showSmsRequiredDialog()
-                } else {
-                    requestSmsRole() // Повторяем запрос, если не было постоянного отказа
+                    return
                 }
             }
+            // Для других версий просто показываем диалог
+            showSmsRequiredDialog()
         }
     }
 
