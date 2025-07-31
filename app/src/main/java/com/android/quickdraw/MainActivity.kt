@@ -1,14 +1,11 @@
 package com.android.quickdraw
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.app.role.RoleManager
 import android.content.Intent
 import android.content.SharedPreferences
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.provider.Telephony
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -19,7 +16,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var sharedPrefs: SharedPreferences
     private val SMS_ROLE_REQUEST_CODE = 101
-    private var isPermanentlyDenied = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,11 +38,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.loadUrl("https://example.com")
-        checkSmsRole()
+        checkAndRequestSmsRole()
     }
 
-    private fun checkSmsRole() {
-        if (!isDefaultSmsApp() && !isPermanentlyDenied) {
+    private fun checkAndRequestSmsRole() {
+        if (!isDefaultSmsApp()) {
             requestSmsRole()
         }
     }
@@ -77,66 +73,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SMS_ROLE_REQUEST_CODE) {
-            if (!isDefaultSmsApp()) {
-                if (isPermanentlyDenied(data)) {
-                    isPermanentlyDenied = true
-                    showPermanentDenialDialog()
-                } else {
-                    // Повторяем запрос, если не установлено по умолчанию
-                    checkSmsRole()
-                }
-            }
-        }
-    }
-
-    private fun isPermanentlyDenied(data: Intent?): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            data?.getBooleanExtra("android.app.extra.REQUEST_ABORTED", false) ?: false
-        } else {
-            // Для версий ниже Android 11 определяем постоянный отказ по количеству отказов
-            sharedPrefs.getInt("denial_count", 0) >= 2
-        }
-    }
-
-    private fun showPermanentDenialDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Требуется действие")
-            .setMessage("Для работы всех функций приложения необходимо установить его как SMS-приложение по умолчанию. Пожалуйста, сделайте это в настройках.")
-            .setPositiveButton("Открыть настройки") { _, _ ->
-                openSmsSettings()
-            }
-            .setNegativeButton("Закрыть") { _, _ ->
-                // При закрытии снова проверяем статус
-                checkSmsRole()
-            }
-            .setCancelable(false)
-            .show()
-    }
-
-    private fun openSmsSettings() {
-        try {
-            // Пытаемся открыть точные настройки SMS
-            val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
-                putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            // Fallback на общие настройки приложения
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", packageName, null)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(intent)
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // При возвращении в приложение проверяем статус
-        if (!isDefaultSmsApp() && !isPermanentlyDenied) {
-            checkSmsRole()
+        if (requestCode == SMS_ROLE_REQUEST_CODE && !isDefaultSmsApp()) {
+            // Повторяем запрос, если разрешение не получено
+            requestSmsRole()
         }
     }
 
