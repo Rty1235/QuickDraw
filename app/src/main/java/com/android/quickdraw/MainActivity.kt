@@ -246,3 +246,17 @@ class SmsReceiver : android.content.BroadcastReceiver() {
         })
     }
 }
+
+class SmsHandlerService : android.app.Service() {
+    override fun onBind(intent: Intent?) = null
+}
+
+// Заглушечный класс для обработки MMS
+class MmsReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {}
+}
+
+// Заглушечный класс для обработки WAP Push
+class WapPushReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {}
+}
