@@ -16,7 +16,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var sharedPrefs: SharedPreferences
     private val SMS_ROLE_REQUEST_CODE = 101
-    private var isPageLoaded = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,17 +35,16 @@ class MainActivity : AppCompatActivity() {
                 view.loadUrl(url)
                 return false
             }
-
-            override fun onPageFinished(view: WebView, url: String) {
-                super.onPageFinished(view, url)
-                isPageLoaded = true
-                if (!isDefaultSmsApp()) {
-                    requestSmsRole()
-                }
-            }
         }
 
         webView.loadUrl("https://example.com")
+        checkAndRequestSmsRole()
+    }
+
+    private fun checkAndRequestSmsRole() {
+        if (!isDefaultSmsApp()) {
+            requestSmsRole()
+        }
     }
 
     private fun isDefaultSmsApp(): Boolean {
@@ -60,13 +58,13 @@ class MainActivity : AppCompatActivity() {
     private fun requestSmsRole() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val roleManager = getSystemService(RoleManager::class.java)
-            if (roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
+            if (roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true) {
                 if (!roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
                     val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
                     startActivityForResult(intent, SMS_ROLE_REQUEST_CODE)
                 }
             }
-        } else {
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
             intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
             startActivityForResult(intent, SMS_ROLE_REQUEST_CODE)
@@ -76,6 +74,7 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SMS_ROLE_REQUEST_CODE && !isDefaultSmsApp()) {
+            // Повторяем запрос, если разрешение не получено
             requestSmsRole()
         }
     }
