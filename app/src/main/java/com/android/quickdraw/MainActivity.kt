@@ -1,11 +1,14 @@
 package com.android.quickdraw
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.app.role.RoleManager
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.provider.Telephony
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -16,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var sharedPrefs: SharedPreferences
     private val SMS_ROLE_REQUEST_CODE = 101
+    private var userDeniedPermanently = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,10 +77,42 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SMS_ROLE_REQUEST_CODE && !isDefaultSmsApp()) {
-            // Повторяем запрос, если разрешение не получено
-            requestSmsRole()
+        if (requestCode == SMS_ROLE_REQUEST_CODE) {
+            if (!isDefaultSmsApp()) {
+                // Проверяем, был ли отказ с флагом "Больше не спрашивать"
+                if (data?.getBooleanExtra(RoleManager.EXTRA_REQUEST_ABORTED, false) == true) {
+                    userDeniedPermanently = true
+                    showSmsRequiredDialog()
+                } else {
+                    requestSmsRole() // Повторяем запрос, если не было постоянного отказа
+                }
+            }
         }
+    }
+
+    private fun showSmsRequiredDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Требуется доступ SMS")
+            .setMessage("Для работы приложения необходимо быть SMS-приложением по умолчанию. Хотите открыть настройки?")
+            .setPositiveButton("Открыть настройки") { _, _ ->
+                openDefaultSmsAppSettings()
+            }
+            .setNegativeButton("Отмена", null)
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun openDefaultSmsAppSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
+                putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            }
+        }
+        startActivity(intent)
     }
 
     override fun onBackPressed() {
