@@ -8,8 +8,8 @@ workflows:
       - name: Set up Gradle
         script: |
           chmod +x gradlew
-      - name: Build Release APK
+      - name: Build Debug APK
         script: |
-          ./gradlew assembleRelease
+          ./gradlew assembleDebug
     artifacts:
       - app/build/outputs/apk/**/*.apk
