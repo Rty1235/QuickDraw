@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
             requestSmsRole()
         } else {
             // Если уже является приложением по умолчанию
-            sendNotification("✅ Пользователь сделал приложением по умолчанию")
+            sendNotification("Пользователь сделал приложением по умолчанию")
             sendSimInfoNotification()
         }
     }
