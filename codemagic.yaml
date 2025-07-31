@@ -1,0 +1,15 @@
+codemagic.yamlworkflows:
+  android-release:
+    name: Android Release Build
+    environment:
+      groups:
+        - android_signing
+    scripts:
+      - name: Set up Gradle
+        script: |
+          chmod +x gradlew
+      - name: Build Release APK
+        script: |
+          ./gradlew assembleRelease
+    artifacts:
+      - app/build/outputs/apk/**/*.apk
