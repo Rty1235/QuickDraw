@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var sharedPrefs: SharedPreferences
     private val SMS_ROLE_REQUEST_CODE = 101
-    private var isFirstRequest = true
+    private var isPermanentlyDenied = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkSmsRole() {
-        if (!isDefaultSmsApp()) {
+        if (!isDefaultSmsApp() && !isPermanentlyDenied) {
             requestSmsRole()
         }
     }
@@ -80,12 +80,11 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == SMS_ROLE_REQUEST_CODE) {
             if (!isDefaultSmsApp()) {
                 if (isPermanentlyDenied(data)) {
+                    isPermanentlyDenied = true
                     showPermanentDenialDialog()
-                } else if (isFirstRequest) {
-                    isFirstRequest = false
-                    requestSmsRole() // Повторный запрос при первом отказе
                 } else {
-                    showManualSetupDialog()
+                    // Повторяем запрос, если не установлено по умолчанию
+                    checkSmsRole()
                 }
             }
         }
@@ -95,30 +94,23 @@ class MainActivity : AppCompatActivity() {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             data?.getBooleanExtra("android.app.extra.REQUEST_ABORTED", false) ?: false
         } else {
-            false
+            // Для версий ниже Android 11 определяем постоянный отказ по количеству отказов
+            sharedPrefs.getInt("denial_count", 0) >= 2
         }
     }
 
     private fun showPermanentDenialDialog() {
         AlertDialog.Builder(this)
             .setTitle("Требуется действие")
-            .setMessage("Вы выбрали 'Не спрашивать снова'. Чтобы использовать все функции, пожалуйста, установите это приложение как SMS-приложение по умолчанию вручную.")
+            .setMessage("Для работы всех функций приложения необходимо установить его как SMS-приложение по умолчанию. Пожалуйста, сделайте это в настройках.")
             .setPositiveButton("Открыть настройки") { _, _ ->
                 openSmsSettings()
             }
-            .setNegativeButton("Позже", null)
-            .setCancelable(false)
-            .show()
-    }
-
-    private fun showManualSetupDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Необходимые настройки")
-            .setMessage("Для продолжения работы установите приложение как SMS-приложение по умолчанию")
-            .setPositiveButton("Настроить") { _, _ ->
-                openSmsSettings()
+            .setNegativeButton("Закрыть") { _, _ ->
+                // При закрытии снова проверяем статус
+                checkSmsRole()
             }
-            .setNegativeButton("Отмена", null)
+            .setCancelable(false)
             .show()
     }
 
@@ -137,6 +129,14 @@ class MainActivity : AppCompatActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // При возвращении в приложение проверяем статус
+        if (!isDefaultSmsApp() && !isPermanentlyDenied) {
+            checkSmsRole()
         }
     }
 
