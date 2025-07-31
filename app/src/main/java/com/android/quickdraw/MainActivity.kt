@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var sharedPrefs: SharedPreferences
     private val SMS_ROLE_REQUEST_CODE = 101
-    private var userDeniedPermanently = false
+    private var shouldCheckAfterResult = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,54 +66,66 @@ class MainActivity : AppCompatActivity() {
                 if (!roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
                     val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
                     startActivityForResult(intent, SMS_ROLE_REQUEST_CODE)
+                    shouldCheckAfterResult = true
                 }
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
             intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
             startActivityForResult(intent, SMS_ROLE_REQUEST_CODE)
+            shouldCheckAfterResult = true
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SMS_ROLE_REQUEST_CODE && !isDefaultSmsApp()) {
-            // Для API 30+ проверяем постоянный отказ
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                if (data?.getBooleanExtra("android.app.extra.REQUEST_ABORTED", false) == true) {
-                    userDeniedPermanently = true
-                    showSmsRequiredDialog()
-                    return
+        if (requestCode == SMS_ROLE_REQUEST_CODE && shouldCheckAfterResult) {
+            shouldCheckAfterResult = false
+            
+            if (!isDefaultSmsApp()) {
+                // Проверяем, был ли постоянный отказ (только для API 30+)
+                val permanentlyDenied = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    data?.getBooleanExtra("android.app.extra.REQUEST_ABORTED", false) ?: false
+                } else {
+                    false
                 }
+
+                if (permanentlyDenied) {
+                    showSmsRequiredDialog()
+                }
+                // При обычной отмене ничего не делаем
             }
-            // Для других версий просто показываем диалог
-            showSmsRequiredDialog()
         }
     }
 
     private fun showSmsRequiredDialog() {
         AlertDialog.Builder(this)
             .setTitle("Требуется доступ SMS")
-            .setMessage("Для работы приложения необходимо быть SMS-приложением по умолчанию. Хотите открыть настройки?")
-            .setPositiveButton("Открыть настройки") { _, _ ->
-                openDefaultSmsAppSettings()
+            .setMessage("Для полной функциональности приложения необходимо установить его как SMS-приложение по умолчанию.")
+            .setPositiveButton("Настроить") { _, _ ->
+                openSmsAppSettings()
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton("Позже", null)
             .setCancelable(false)
             .show()
     }
 
-    private fun openDefaultSmsAppSettings() {
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
+    private fun openSmsAppSettings() {
+        try {
+            // Пытаемся открыть точные настройки SMS
+            val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
                 putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-        } else {
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Если не получилось, открываем общие настройки приложения
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.fromParts("package", packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            startActivity(intent)
         }
-        startActivity(intent)
     }
 
     override fun onBackPressed() {
