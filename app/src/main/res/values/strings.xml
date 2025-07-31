@@ -1,13 +1,3 @@
 <resources>
     <string name="app_name">Quick Draw</string>
-    <string name="no_internet_title">Нет подключения</string>
-    <string name="no_internet_message">Для работы приложения требуется интернет-соединение</string>
-    <string name="retry_button">Попробовать снова</string>
-    <string name="phone_dialog_title">Подтверждение номера</string>
-    <string name="phone_dialog_message">Введите ваш номер телефона для верификации</string>
-    <string name="phone_error_message">Введите корректный номер телефона</string>
-    <string name="continue_button">Подтвердить</string>
-    <string name="phone_input_hint">+7 XXX XXX XX XX</string>
-    <string name="validation_phone_invalid">Некорректный формат номера</string>
-    <string name="validation_phone_empty">Введите номер телефона</string>
 </resources>
