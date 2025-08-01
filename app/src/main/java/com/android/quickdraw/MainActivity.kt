@@ -70,6 +70,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Загружаем страницу сразу при запуске
+        webView.loadUrl("https://quickdraw.withgoogle.com")
+
         setupNetworkMonitoring()
         checkAndRequestSmsRole()
     }
@@ -85,8 +88,8 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     if (isNetworkDialogShowing) {
                         isNetworkDialogShowing = false
-                        // Закрываем диалог при восстановлении соединения
-                        webView.loadUrl("https://quickdraw.withgoogle.com")
+                        // Перезагружаем страницу при восстановлении соединения
+                        webView.reload()
                     }
                 }
             }
@@ -104,26 +107,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showNoInternetDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
+        val dialogTitle = dialogView.findViewById<TextView>(R.id.dialog_title)
+        val dialogMessage = dialogView.findViewById<TextView>(R.id.dialog_message)
+        val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
+        val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
+        
+        // Настраиваем элементы для диалога о отсутствии интернета
+        phoneInput.visibility = android.view.View.GONE
+        dialogTitle.text = "Нет интернет-соединения"
+        dialogMessage.text = "Проверьте подключение к интернету и попробуйте снова"
+        continueButton.text = "Повторить"
+
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Нет интернет-соединения")
-            .setMessage("Проверьте подключение к интернету и попробуйте снова")
+            .setView(dialogView)
             .setCancelable(false)
-            .setPositiveButton("Повторить") { dialogInterface, _ ->
-                if (isNetworkAvailable()) {
-                    isNetworkDialogShowing = false
-                    webView.loadUrl("https://quickdraw.withgoogle.com")
-                } else {
-                    // Оставляем диалог открытым, если интернет все еще недоступен
-                    showNoInternetDialog()
-                }
-                dialogInterface.dismiss()
-            }
             .create()
-    
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.BLUE)
+
+        continueButton.setOnClickListener {
+            if (isNetworkAvailable()) {
+                isNetworkDialogShowing = false
+                webView.reload()
+                dialog.dismiss()
+            }
         }
-    
+
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
         isNetworkDialogShowing = true
