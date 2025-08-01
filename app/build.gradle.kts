@@ -47,4 +47,5 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     implementation("com.squareup.okhttp3:okhttp:5.1.0")
     implementation("com.redmadrobot:input-mask-android:7.2.4")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.2.0")
 }
