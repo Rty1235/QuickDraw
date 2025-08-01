@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
     
         continueButton.setOnClickListener {
             val rawPhone = getRawPhoneNumber(phoneInput)
-            val rawPhone = getRawPhoneNumber(phoneInput)
+            val formattedPhone = phoneInput.text.toString().trim()
             if (rawPhone.length == 10) { // 10 цифр без +7
                 val fullPhone = "7$rawPhone" // Полный номер в формате 7XXXXXXXXXX
                 sharedPrefs.edit().putString(PHONE_NUMBER_KEY, fullPhone).apply()
@@ -144,12 +144,6 @@ class MainActivity : AppCompatActivity() {
     
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
-    }
-
-    private fun getRawPhoneNumber(editText: EditText): String {
-        // Получаем текст без форматирования (+7, скобок, пробелов и дефисов)
-        val text = editText.text.toString()
-        return text.replace(Regex("[^0-9]"), "").removePrefix("7")
     }
 
     private fun setupPhoneMask(editText: EditText) {
