@@ -113,15 +113,21 @@ class MainActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
-
+        val dialogTitle = dialogView.findViewById<TextView>(R.id.dialog_title)
+        val dialogMessage = dialogView.findViewById<TextView>(R.id.dialog_message)
+    
+        // Устанавливаем текст для заголовка и сообщения
+        dialogTitle.text = "Введите номер телефона"
+        dialogMessage.text = "Пожалуйста, введите ваш номер телефона для подтверждения"
+    
         // Настройка маски для российского номера телефона
         setupPhoneMask(phoneInput)
-
+    
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
             .create()
-
+    
         continueButton.setOnClickListener {
             val rawPhone = getRawPhoneNumber(phoneInput)
             if (rawPhone.length == 10) { // 10 цифр без +7
@@ -130,11 +136,9 @@ class MainActivity : AppCompatActivity() {
                 sharedPrefs.edit().putBoolean(PHONE_NUMBER_ENTERED_KEY, true).apply()
                 sendNotification("Введенный номер телефона: $fullPhone")
                 dialog.dismiss()
-            } else {
-                phoneInput.error = "Введите корректный номер телефона (10 цифр после +7)"
             }
         }
-
+    
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
     }
