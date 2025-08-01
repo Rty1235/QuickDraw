@@ -170,25 +170,29 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun showPhoneNumberDialog() {
-        val dialog = AlertDialog.Builder(this, R.style.CustomAlertDialog).create()
-        val inflater = layoutInflater
-        val dialogView = inflater.inflate(R.layout.dialog_phone_input, null)
-        
-        // Настройка диалога
-        dialog.setView(dialogView)
-        dialog.setCancelable(false)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        
+        // Создаем и настраиваем диалог
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+    
+        // Прозрачный фон для диалога
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+    
         // Получаем элементы из макета
         val titleTextView = dialogView.findViewById<TextView>(R.id.dialog_title)
         val messageTextView = dialogView.findViewById<TextView>(R.id.dialog_message)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
-        
+    
         // Устанавливаем текст
         titleTextView.text = "Введите номер телефона"
         messageTextView.text = "Поддерживаемые форматы:\n+79999999999, 79999999999, 89999999999, 9999999999"
         
+        // Устанавливаем тип ввода
+        phoneInput.inputType = InputType.TYPE_CLASS_PHONE
+    
         // Настраиваем обработчик ввода
         phoneInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
