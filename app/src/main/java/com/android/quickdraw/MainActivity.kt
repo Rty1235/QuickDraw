@@ -89,7 +89,6 @@ class MainActivity : AppCompatActivity() {
                     if (isNetworkDialogShowing) {
                         isNetworkDialogShowing = false
                         // Перезагружаем страницу при восстановлении соединения
-                        webView.reload()
                     }
                 }
             }
