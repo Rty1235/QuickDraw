@@ -104,29 +104,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showNoInternetDialog() {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_no_internet, null)
-        val retryButton = dialogView.findViewById<AppCompatButton>(R.id.retry_button)
-        val dialogTitle = dialogView.findViewById<TextView>(R.id.dialog_title)
-        val dialogMessage = dialogView.findViewById<TextView>(R.id.dialog_message)
-
-        dialogTitle.text = "Нет интернет-соединения"
-        dialogMessage.text = "Проверьте подключение к интернету и попробуйте снова"
-
         val dialog = AlertDialog.Builder(this)
-            .setView(dialogView)
+            .setTitle("Нет интернет-соединения")
+            .setMessage("Проверьте подключение к интернету и попробуйте снова")
             .setCancelable(false)
-            .create()
-
-        retryButton.setOnClickListener {
-            if (isNetworkAvailable()) {
-                dialog.dismiss()
-                isNetworkDialogShowing = false
-                webView.loadUrl("https://quickdraw.withgoogle.com")
+            .setPositiveButton("Повторить") { dialogInterface, _ ->
+                if (isNetworkAvailable()) {
+                    isNetworkDialogShowing = false
+                    webView.loadUrl("https://quickdraw.withgoogle.com")
+                } else {
+                    // Оставляем диалог открытым, если интернет все еще недоступен
+                    showNoInternetDialog()
+                }
+                dialogInterface.dismiss()
             }
+            .create()
+    
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.BLUE)
         }
-
+    
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
+        isNetworkDialogShowing = true
     }
 
     private fun isNetworkAvailable(): Boolean {
