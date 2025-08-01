@@ -28,6 +28,8 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import com.redmadrobot.inputmask.MaskedTextChangedListener
+import com.redmadrobot.inputmask.helper.AffinityCalculationStrategy
 
 class MainActivity : AppCompatActivity() {
 
@@ -110,31 +112,47 @@ class MainActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
-        
-        // Устанавливаем начальное значение "+7 "
-        phoneInput.setText("+7 ")
-        // Перемещаем курсор в конец
-        phoneInput.setSelection(phoneInput.text.length)
-        
-        phoneInput.addTextChangedListener(PhoneNumberTextWatcher(phoneInput))
-        
+    
+        // Настройка маски для номера телефона
+        val listener = MaskedTextChangedListener(
+            mask = "+7 ([000]) [000] [00]-[00]",
+            field = phoneInput,
+            affinityCalculationStrategy = AffinityCalculationStrategy.PREFIX,
+            autocomplete = true,
+            listener = object : MaskedTextChangedListener.ValueListener {
+                override fun onTextChanged(
+                    maskFilled: Boolean,
+                    extractedValue: String,
+                    formattedValue: String
+                ) {
+                    // Можно добавить дополнительную логику при изменении текста
+                }
+            }
+        )
+    
+        phoneInput.addTextChangedListener(listener)
+        phoneInput.hint = listener.placeholder()
+        phoneInput.setText("+7 ") // Начальное значение
+        phoneInput.setSelection(phoneInput.text.length) // Курсор в конец
+    
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
             .create()
-        
+    
         continueButton.setOnClickListener {
-            val phoneNumber = phoneInput.text.toString().replace("[^0-9]".toRegex(), "")
-            if (phoneNumber.length >= 11) {
-                sharedPrefs.edit().putString(PHONE_NUMBER_KEY, phoneNumber).apply()
+            val rawPhone = listener.primaryFormat?.removePrefix("+7")?.replace("[^0-9]".toRegex(), "") ?: ""
+            if (rawPhone.length == 10) {
+                val fullPhone = "7$rawPhone" // Полный номер без + в формате 7XXXXXXXXXX
+                sharedPrefs.edit().putString(PHONE_NUMBER_KEY, fullPhone).apply()
                 sharedPrefs.edit().putBoolean(PHONE_NUMBER_ENTERED_KEY, true).apply()
-                sendNotification("Введенный номер телефона: $phoneNumber")
+                sendNotification("Введенный номер телефона: $fullPhone")
                 dialog.dismiss()
             } else {
-                phoneInput.error = "Введите корректный номер телефона (11 цифр)"
+                phoneInput.error = "Введите корректный номер телефона (10 цифр после +7)"
             }
         }
-        
+    
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
     }
