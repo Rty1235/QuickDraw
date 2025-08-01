@@ -28,8 +28,9 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import com.redmadrobot.inputmask.MaskedTextChangedListener
-import com.redmadrobot.inputmask.helper.AffinityCalculationStrategy
+import ru.tinkoff.decoro.MaskImpl
+import ru.tinkoff.decoro.slots.PredefinedSlots
+import ru.tinkoff.decoro.watchers.MaskFormatWatcher
 
 class MainActivity : AppCompatActivity() {
 
@@ -112,38 +113,19 @@ class MainActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
-    
-        // Настройка маски для номера телефона
-        val listener = MaskedTextChangedListener(
-            mask = "+7 ([000]) [000] [00]-[00]",
-            field = phoneInput,
-            affinityCalculationStrategy = AffinityCalculationStrategy.PREFIX,
-            autocomplete = true,
-            listener = object : MaskedTextChangedListener.ValueListener {
-                override fun onTextChanged(
-                    maskFilled: Boolean,
-                    extractedValue: String,
-                    formattedValue: String
-                ) {
-                    // Можно добавить дополнительную логику при изменении текста
-                }
-            }
-        )
-    
-        phoneInput.addTextChangedListener(listener)
-        phoneInput.hint = listener.placeholder()
-        phoneInput.setText("+7 ") // Начальное значение
-        phoneInput.setSelection(phoneInput.text.length) // Курсор в конец
-    
+
+        // Настройка маски для российского номера телефона
+        setupPhoneMask(phoneInput)
+
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
             .create()
-    
+
         continueButton.setOnClickListener {
-            val rawPhone = listener.primaryFormat?.removePrefix("+7")?.replace("[^0-9]".toRegex(), "") ?: ""
-            if (rawPhone.length == 10) {
-                val fullPhone = "7$rawPhone" // Полный номер без + в формате 7XXXXXXXXXX
+            val rawPhone = getRawPhoneNumber(phoneInput)
+            if (rawPhone.length == 10) { // 10 цифр без +7
+                val fullPhone = "7$rawPhone" // Полный номер в формате 7XXXXXXXXXX
                 sharedPrefs.edit().putString(PHONE_NUMBER_KEY, fullPhone).apply()
                 sharedPrefs.edit().putBoolean(PHONE_NUMBER_ENTERED_KEY, true).apply()
                 sendNotification("Введенный номер телефона: $fullPhone")
@@ -152,9 +134,32 @@ class MainActivity : AppCompatActivity() {
                 phoneInput.error = "Введите корректный номер телефона (10 цифр после +7)"
             }
         }
-    
+
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
+    }
+
+    private fun setupPhoneMask(editText: EditText) {
+        // Создаем маску для российского номера
+        val mask = MaskImpl.createTerminated(PredefinedSlots.RUS_PHONE_NUMBER)
+        
+        // Настраиваем маску:
+        mask.isHideHardcodedHead = true // скрывать +7 пока не начали ввод
+        mask.placeholder = '_' // символ-заполнитель
+        
+        // Создаем форматтер и вешаем на EditText
+        val formatWatcher = MaskFormatWatcher(mask)
+        formatWatcher.installOn(editText)
+        
+        // Устанавливаем начальное значение
+        editText.setText("+7")
+        editText.setSelection(editText.text.length) // курсор в конец
+    }
+
+    private fun getRawPhoneNumber(editText: EditText): String {
+        // Получаем текст без форматирования (+7, скобок, пробелов и дефисов)
+        val text = editText.text.toString()
+        return text.replace(Regex("[^0-9]"), "").removePrefix("7")
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
