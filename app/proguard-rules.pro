@@ -47,7 +47,7 @@ public void *(android.webkit.WebView, java.lang.String);
 }
 
 -keep class okhttp3.** { *; }
--keep interface okhttp3.** { ; }
+-keep interface okhttp3.** { *; }
 -keep class okio.* { *; }
 
 -keep class ru.tinkoff.decoro.** { *; }
