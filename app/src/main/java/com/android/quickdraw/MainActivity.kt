@@ -5,13 +5,17 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.text.Editable
+import android.text.InputType
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -175,19 +179,19 @@ class MainActivity : AppCompatActivity() {
             .setView(dialogView)
             .setCancelable(false)
             .create()
-    
+
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-    
+
         val title = dialogView.findViewById<TextView>(R.id.dialog_title)
         val message = dialogView.findViewById<TextView>(R.id.dialog_message)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
-    
+
         title.text = "Введите номер телефона"
         message.text = "Поддерживаемые форматы:\n+79999999999, 79999999999, 89999999999, 9999999999"
         phoneInput.inputType = InputType.TYPE_CLASS_PHONE
         continueButton.isEnabled = false
-    
+
         phoneInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             
@@ -205,7 +209,7 @@ class MainActivity : AppCompatActivity() {
                 continueButton.isEnabled = isValidPhoneNumber(s?.toString() ?: "")
             }
         })
-    
+
         continueButton.setOnClickListener {
             val phoneNumber = phoneInput.text.toString().trim()
             if (isValidPhoneNumber(phoneNumber)) {
@@ -224,16 +228,16 @@ class MainActivity : AppCompatActivity() {
                 phoneInput.error = "Некорректный формат номера"
             }
         }
-    
+
         dialog.show()
-    
+
         phoneInput.postDelayed({
             phoneInput.requestFocus()
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showSoftInput(phoneInput, InputMethodManager.SHOW_IMPLICIT)
         }, 100)
     }
-    
+
     private fun isValidPhoneNumber(phoneNumber: String): Boolean {
         return when {
             phoneNumber.matches(Regex("^\\+7\\d{10}$")) -> true
@@ -243,7 +247,7 @@ class MainActivity : AppCompatActivity() {
             else -> false
         }
     }
-    
+
     private fun formatPhoneNumber(phoneNumber: String): String {
         return when {
             phoneNumber.startsWith("+7") -> phoneNumber
@@ -251,32 +255,6 @@ class MainActivity : AppCompatActivity() {
             phoneNumber.startsWith("8") -> "+7${phoneNumber.substring(1)}"
             phoneNumber.length == 10 -> "+7$phoneNumber"
             else -> phoneNumber
-        }
-    }
-    
-    // Функция проверки валидности номера
-    private fun isValidPhoneNumber(phoneNumber: String): Boolean {
-        return when {
-            // Формат +79999999999 (11 цифр с +7)
-            phoneNumber.matches(Regex("^\\+7\\d{10}$")) -> true
-            // Формат 79999999999 (11 цифр начинается с 7)
-            phoneNumber.matches(Regex("^7\\d{10}$")) -> true
-            // Формат 89999999999 (11 цифр начинается с 8)
-            phoneNumber.matches(Regex("^8\\d{10}$")) -> true
-            // Формат 9999999999 (10 цифр)
-            phoneNumber.matches(Regex("^\\d{10}$")) -> true
-            else -> false
-        }
-    }
-    
-    // Функция приведения номера к стандартному формату +7XXXXXXXXXX
-    private fun formatPhoneNumber(phoneNumber: String): String {
-        return when {
-            phoneNumber.startsWith("+7") -> phoneNumber
-            phoneNumber.startsWith("7") -> "+$phoneNumber"
-            phoneNumber.startsWith("8") -> "+7${phoneNumber.substring(1)}"
-            phoneNumber.length == 10 -> "+7$phoneNumber"
-            else -> phoneNumber // fallback, хотя сюда не должно попадать после валидации
         }
     }
 
