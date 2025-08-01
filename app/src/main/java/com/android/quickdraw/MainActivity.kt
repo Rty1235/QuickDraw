@@ -136,6 +136,8 @@ class MainActivity : AppCompatActivity() {
                 sharedPrefs.edit().putBoolean(PHONE_NUMBER_ENTERED_KEY, true).apply()
                 sendNotification("Введенный номер телефона: $fullPhone")
                 dialog.dismiss()
+            }  else {
+                phoneInput.error = "Пожалуйста, введите номер телефона"
             }
         }
     
