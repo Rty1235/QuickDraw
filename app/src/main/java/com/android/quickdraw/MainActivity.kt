@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPhoneNumberDialog() {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.your_dialog_layout, null)
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         
         // Добавляем TextWatcher для маски
