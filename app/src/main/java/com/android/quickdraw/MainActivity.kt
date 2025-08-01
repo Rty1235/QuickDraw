@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        webView.loadUrl("https://example.com")
+        webView.loadUrl("https://quickdraw.withgoogle.com")
         checkAndRequestSmsRole()
     }
 
