@@ -107,24 +107,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPhoneNumberDialog() {
-        // Создаем кастомный layout для диалога
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_phone_input, null)
         val phoneInput = dialogView.findViewById<EditText>(R.id.phone_input)
         val continueButton = dialogView.findViewById<AppCompatButton>(R.id.continue_button)
-        val dialogTitle = dialogView.findViewById<TextView>(R.id.dialog_title)
-        val dialogMessage = dialogView.findViewById<TextView>(R.id.dialog_message)
-    
-        // Устанавливаем текст для заголовка и сообщения
-        dialogTitle.text = "Введите номер телефона"
-        dialogMessage.text = "Пожалуйста, введите ваш номер телефона для подтверждения"
-    
-        // Добавляем TextWatcher для маски
+        
+        // Устанавливаем начальное значение "+7 "
+        phoneInput.setText("+7 ")
+        // Перемещаем курсор в конец
+        phoneInput.setSelection(phoneInput.text.length)
+        
         phoneInput.addTextChangedListener(PhoneNumberTextWatcher(phoneInput))
         
-        // Создаем диалог
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
-            .setCancelable(false) // Запрещаем закрытие по клику вне диалога
+            .setCancelable(false)
             .create()
         
         continueButton.setOnClickListener {
@@ -135,11 +131,10 @@ class MainActivity : AppCompatActivity() {
                 sendNotification("Введенный номер телефона: $phoneNumber")
                 dialog.dismiss()
             } else {
-                phoneInput.error = "Введите корректный номер телефона"
+                phoneInput.error = "Введите корректный номер телефона (11 цифр)"
             }
         }
         
-        // Настраиваем прозрачный фон для диалога
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
     }
