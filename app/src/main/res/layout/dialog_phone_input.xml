@@ -3,29 +3,45 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="24dp"
+    android:background="@drawable/dialog_background">
 
     <TextView
+        android:id="@+id/dialog_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Введите ваш номер телефона"
-        android:textSize="18sp"
+        android:textSize="20sp"
+        android:textColor="#333333"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/dialog_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        android:textColor="#666666"
+        android:gravity="center"
         android:layout_marginBottom="16dp"/>
 
     <EditText
-        android:id="@+id/phoneInput"
+        android:id="@+id/phone_input"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:hint="Номер телефона"
         android:inputType="phone"
-        android:maxLength="12"
-        android:textSize="18sp"/>
+        android:padding="12dp"
+        android:background="@drawable/edit_text_background"
+        android:layout_marginBottom="24dp"/>
 
-    <Button
-        android:id="@+id/continueButton"
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/continue_button"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="48dp"
         android:text="Продолжить"
-        android:layout_marginTop="16dp"
-        android:enabled="false"/>
+        android:textColor="#FFFFFF"
+        android:background="@drawable/button_background"
+        android:textAllCaps="false" />
 
 </LinearLayout>
