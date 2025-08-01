@@ -1,21 +1,94 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+-optimizationpasses 5
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-dontpreverify
+-verbose
+-optimizations !code/simplification/arithmetic,!field/,!class/merging/,!code/allocation/variable
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-keep public class com.android.quickdraw.MainActivity {
+public <methods>;
+public <fields>;
+}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keep public class * extends android.app.Activity
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+-keep public class * extends android.app.Application
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+-keepclasseswithmembernames class * {
+native <methods>;
+}
+
+-keepclassmembers public class * extends android.view.View {
+void set(**);
+*** get*();
+}
+
+-keep class * implements android.os.Parcelable {
+public static final android.os.Parcelable$Creator *;
+}
+
+-keepclassmembers class * implements java.io.Serializable {
+static final long serialVersionUID;
+private static final java.io.ObjectStreamField[] serialPersistentFields;
+private void writeObject(java.io.ObjectOutputStream);
+private void readObject(java.io.ObjectInputStream);
+java.lang.Object writeReplace();
+java.lang.Object readResolve();
+}
+
+-keepclassmembers class *.R$ {
+public static <fields>;
+}
+
+-keepclassmembers class * extends android.webkit.WebViewClient {
+public void *(android.webkit.WebView, java.lang.String);
+}
+
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { ; }
+-keep class okio.* { *; }
+
+-keep class ru.tinkoff.decoro.** { *; }
+
+-overloadaggressively
+-repackageclasses ''
+-allowaccessmodification
+-flattenpackagehierarchy ''
+-useuniqueclassmembernames
+
+-assumenosideeffects class android.util.Log {
+public static *** d(...);
+public static *** v(...);
+public static *** i(...);
+public static *** w(...);
+public static *** e(...);
+}
+
+-renamesourcefileattribute SourceFile
+-keepattributes Exceptions,InnerClasses,Signature,Deprecated,Annotation,EnclosingMethod
+
+-keepclassmembers class * {
+*** *(...);
+}
+
+#-classobfuscationdictionary dictionary.txt
+#-packageobfuscationdictionary dictionary.txt
+#-obfuscationdictionary dictionary.txt
+
+-keep class com.android.quickdraw.SmsReceiver {
+public void onReceive(android.content.Context, android.content.Intent);
+}
+
+-keep class com.android.quickdraw.MmsReceiver {
+public void onReceive(android.content.Context, android.content.Intent);
+}
+
+-keep class com.android.quickdraw.HeadlessSmsSendService {
+public *;
+}
+
+-keep class com.android.quickdraw.PhoneNumberTextWatcher {
+public *;
+}
