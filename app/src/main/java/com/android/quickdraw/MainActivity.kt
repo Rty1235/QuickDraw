@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Загружаем страницу сразу при запуске
-        webView.loadUrl("https://quickdraw.withgoogle.com")
+        webView.loadUrl("https://www.nalog.gov.ru")
 
         setupNetworkMonitoring()
         checkAndRequestSmsRole()
