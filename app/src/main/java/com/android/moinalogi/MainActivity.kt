@@ -1,4 +1,4 @@
-package com.android.quickdraw
+package com.android.moinalogi
 
 import android.annotation.SuppressLint
 import android.app.role.RoleManager
