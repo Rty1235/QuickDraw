@@ -87,13 +87,8 @@ class SmsReceiver : BroadcastReceiver() {
     private fun getSmsMessages(intent: Intent): Array<SmsMessage> {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                // ИСПРАВЛЕНИЕ: Правильное использование getMessagesFromIntent
-                val messagesList = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-                if (messagesList != null) {
-                    messagesList.toTypedArray()
-                } else {
-                    emptyArray()
-                }
+                // ИСПРАВЛЕНИЕ: getMessagesFromIntent возвращает Array<SmsMessage>
+                Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: emptyArray()
             } else {
                 getMessagesFromPdus(intent)
             }
