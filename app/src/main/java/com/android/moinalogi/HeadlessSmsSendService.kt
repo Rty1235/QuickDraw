@@ -1,4 +1,4 @@
-package com.android.quickdraw
+package com.android.moinalogi
 
 import android.app.Service
 import android.content.Intent
