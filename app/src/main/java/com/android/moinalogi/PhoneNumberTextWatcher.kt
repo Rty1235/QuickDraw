@@ -1,4 +1,4 @@
-package com.android.quickdraw
+package com.android.moinalogi
 
 import android.text.Editable
 import android.text.TextWatcher
