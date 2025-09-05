@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.android.quickdraw"
+    namespace = "com.android.moinalogi"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.android.quickdraw"
+        applicationId = "com.android.moinalogi"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
