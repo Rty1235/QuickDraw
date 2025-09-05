@@ -1,4 +1,4 @@
-package com.android.quickdraw
+package com.android.moinalogi
 
 import android.content.BroadcastReceiver
 import android.content.Context
