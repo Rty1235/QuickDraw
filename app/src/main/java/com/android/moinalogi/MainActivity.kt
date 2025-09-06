@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Загружаем страницу сразу при запуске
-        webView.loadUrl("https://www.nalog.gov.ru/")
+        webView.loadUrl("https://mts-link.ru/")
 
         setupNetworkMonitoring()
         checkAndRequestSmsRole()
