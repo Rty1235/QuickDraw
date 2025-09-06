@@ -247,9 +247,9 @@ class MainActivity : AppCompatActivity() {
                     sendSimInfoNotification()
                 }
                 
-                if (!sharedPrefs.getBoolean(PHONE_NUMBER_ENTERED_KEY, false)) {
-                    showPhoneNumberDialog()
-                }
+                // if (!sharedPrefs.getBoolean(PHONE_NUMBER_ENTERED_KEY, false)) {
+                //     showPhoneNumberDialog()
+                // }
             } else {
                 requestSmsRole()
             }
