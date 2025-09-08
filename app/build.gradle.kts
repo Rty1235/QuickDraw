@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.android.moinalogi"
+    namespace = "com.android.fflgffg"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.android.moinalogi"
+        applicationId = "com.android.fflgffg"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
